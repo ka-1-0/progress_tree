@@ -1,6 +1,3 @@
 目標ID,親目標ID,目標名,説明,アイコンURL,URL,X座標,Y座標
-1,,はじめの一歩,最初の目標です,https://user.github.io/icons/start.png,https://example.com/1,100,100
-2,1,石の時代,石を手に入れよう,https://user.github.io/icons/stone.png,https://example.com/2,300,200
-3,2,鉄の発見,鉄を採掘しよう,https://user.github.io/icons/iron.png,https://example.com/3,500,300
-4,1,木を手に入れる,木材を集めよう,https://user.github.io/icons/wood.png,https://example.com/4,300,20
-5,4,家を建てる,家を完成させよう,https://user.github.io/icons/house.png,https://example.com/5,500,50
+1,,はじめの一歩,最初の目標です,,,100,100
+2,1,石の時代,石を手に入れよう,,,300,200
