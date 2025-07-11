@@ -57,130 +57,134 @@ function handleFileSelect(event) {
 
 // ファイル処理
 function processFiles(files) {
-    const csvFileList = [];
-    
-    // CSVファイルのみフィルタリング
-    for (let file of files) {
-        if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
-            csvFileList.push(file);
-        }
-    }
-    
-    if (csvFileList.length === 0) {
-        showError('CSVファイルを選択してください。');
-        return;
-    }
-    
-    // ファイルを読み込み
-    csvFileList.forEach(file => {
-        readCSVFile(file);
-    });
+ const dataFileList = [];
+ 
+ // CSV/TSVファイルのみフィルタリング
+ for (let file of files) {
+ if (file.type === 'text/csv' || file.type === 'text/tab-separated-values' || 
+     file.name.endsWith('.csv') || file.name.endsWith('.tsv')) {
+ dataFileList.push(file);
+ }
+ }
+ 
+ if (dataFileList.length === 0) {
+ showError('CSV/TSVファイルを選択してください。');
+ return;
+ }
+ 
+ // ファイルを読み込み
+ dataFileList.forEach(file => {
+ readDataFile(file);
+ });
 }
 
-// CSVファイル読み込み
-function readCSVFile(file) {
-    const reader = new FileReader();
-    
-    reader.onload = function(e) {
-        const csvContent = e.target.result;
-        const fileName = file.name.replace('.csv', '');
-        
-        try {
-            const parsedData = parseCSV(csvContent);
-            csvFiles.set(fileName, parsedData);
-            updateTabs();
-            
-            // 最初のファイルを自動で選択
-            if (csvFiles.size === 1) {
-                switchTab(fileName);
-            }
-        } catch (error) {
-            showError(`${file.name}の読み込みに失敗しました: ${error.message}`);
-        }
-    };
-    
-    reader.onerror = function() {
-        showError(`${file.name}の読み込み中にエラーが発生しました。`);
-    };
-    
-    reader.readAsText(file, 'UTF-8');
+// CSV/TSVファイル読み込み
+function readDataFile(file) {
+ const reader = new FileReader();
+ 
+ reader.onload = function(e) {
+ const fileContent = e.target.result;
+ const fileName = file.name.replace(/\.(csv|tsv)$/, '');
+ const isCSV = file.name.endsWith('.csv');
+ 
+ try {
+ const parsedData = parseDataFile(fileContent, isCSV);
+ csvFiles.set(fileName, parsedData);
+ updateTabs();
+ 
+ // 最初のファイルを自動で選択
+ if (csvFiles.size === 1) {
+ switchTab(fileName);
+ }
+ } catch (error) {
+ showError(`${file.name}の読み込みに失敗しました: ${error.message}`);
+ }
+ };
+ 
+ reader.onerror = function() {
+ showError(`${file.name}の読み込み中にエラーが発生しました。`);
+ };
+ 
+ reader.readAsText(file, 'UTF-8');
 }
 
-// シンプルなCSVパーサー
-function parseCSV(csvText) {
-    const lines = csvText.trim().split('\n');
-    if (lines.length < 2) {
-        throw new Error('CSVファイルが空か、ヘッダー行がありません。');
-    }
-    
-    // ヘッダー行を解析
-    const headers = parseCSVLine(lines[0]);
-    const expectedHeaders = ['目標ID', '親目標ID', '目標名', '説明', 'アイコンURL', 'URL', 'X座標', 'Y座標'];
-    
-    // ヘッダーチェック（部分一致でも許可）
-    const hasRequiredHeaders = expectedHeaders.slice(0, 6).every(header => 
-        headers.some(h => h.includes(header.replace('URL', '')) || header.includes(h))
-    );
-    
-    if (!hasRequiredHeaders) {
-        throw new Error('CSVファイルのヘッダーが正しくありません。必要な列: ' + expectedHeaders.join(', '));
-    }
-    
-    // データ行を解析
-    const data = [];
-    for (let i = 1; i < lines.length; i++) {
-        if (lines[i].trim() === '') continue;
-        
-        const values = parseCSVLine(lines[i]);
-        if (values.length >= 6) {
-            data.push({
-                id: values[0] || '',
-                parentId: values[1] || '',
-                name: values[2] || '',
-                description: values[3] || '',
-                iconUrl: values[4] || '',
-                url: values[5] || '',
-                x: parseInt(values[6]) || 0,
-                y: parseInt(values[7]) || 0
-            });
-        }
-    }
-    
-    return data;
+// CSV/TSVファイルパーサー
+function parseDataFile(fileContent, isCSV = true) {
+ const lines = fileContent.trim().split('\n');
+ if (lines.length < 2) {
+ throw new Error('ファイルが空か、ヘッダー行がありません。');
+ }
+ 
+ // ヘッダー行を解析
+ const headers = parseDataLine(lines[0], isCSV);
+ const expectedHeaders = ['目標ID', '親目標ID', '目標名', '説明', 'アイコンURL', 'URL', 'X座標', 'Y座標'];
+ 
+ // ヘッダーチェック（部分一致でも許可）
+ const hasRequiredHeaders = expectedHeaders.slice(0, 6).every(header => 
+ headers.some(h => h.includes(header.replace('URL', '')) || header.includes(h))
+ );
+ 
+ if (!hasRequiredHeaders) {
+ throw new Error('ファイルのヘッダーが正しくありません。必要な列: ' + expectedHeaders.join(', '));
+ }
+ 
+ // データ行を解析
+ const data = [];
+ for (let i = 1; i < lines.length; i++) {
+ if (lines[i].trim() === '') continue;
+ 
+ const values = parseDataLine(lines[i], isCSV);
+ if (values.length >= 6) {
+ data.push({
+ id: values[0] || '',
+ parentId: values[1] || '',
+ name: values[2] || '',
+ description: values[3] || '',
+ iconUrl: values[4] || '',
+ url: values[5] || '',
+ x: parseInt(values[6]) || 0,
+ y: parseInt(values[7]) || 0
+ });
+ }
+ }
+ 
+ return data;
 }
 
-// CSV行をパース（カンマ区切り、クォート考慮）
-function parseCSVLine(line) {
-    const result = [];
-    let current = '';
-    let inQuotes = false;
-    
-    for (let i = 0; i < line.length; i++) {
-        const char = line[i];
-        const nextChar = line[i + 1];
-        
-        if (char === '"') {
-            if (inQuotes && nextChar === '"') {
-                // エスケープされたクォート
-                current += '"';
-                i++; // 次の文字をスキップ
-            } else {
-                // クォートの開始/終了
-                inQuotes = !inQuotes;
-            }
-        } else if (char === ',' && !inQuotes) {
-            // カンマで区切り
-            result.push(current.trim());
-            current = '';
-        } else {
-            current += char;
-        }
-    }
-    
-    // 最後のフィールドを追加
-    result.push(current.trim());
-    return result;
+// CSV/TSV行をパース（カンマ区切り/タブ区切り、クォート考慮）
+function parseDataLine(line, isCSV = true) {
+ const delimiter = isCSV ? ',' : '\t';
+ const result = [];
+ let current = '';
+ let inQuotes = false;
+ 
+ for (let i = 0; i < line.length; i++) {
+ const char = line[i];
+ const nextChar = line[i + 1];
+ 
+ if (char === '"') {
+ if (inQuotes && nextChar === '"') {
+ // エスケープされたクォート
+ current += '"';
+ i++; // 次の文字をスキップ
+ } else {
+ // クォートの開始/終了
+ inQuotes = !inQuotes;
+ }
+ } else if (char === delimiter && !inQuotes) {
+ // 区切り文字で分割
+ result.push(current.trim());
+ current = '';
+ } else {
+ current += char;
+ }
+ }
+ 
+ // 最後のフィールドを追加
+ result.push(current.trim());
+ return result;
 }
+
 
 // タブを更新
 function updateTabs() {

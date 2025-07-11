@@ -15,12 +15,18 @@
     <div class="container">
         <h1>講習ツリー</h1>
         
-        <!-- CSVファイル読み込みエリア -->
+        <!-- CSVファイル読み込みエリア
         <div id="upload-area" class="upload-area">
             <p>CSVファイルをドラッグ&ドロップするか、クリックして選択してください</p>
             <input type="file" id="csv-input" accept=".csv" multiple>
         </div>
-        
+         -->
+        <div class="upload-area" id="upload-area">
+            <div class="upload-text">CSV/TSVファイルをドラッグ&ドロップするか、クリックして選択してください</div>
+            <input type="file" id="csv-input" accept=".csv,.tsv" multiple style="display: none;">
+        </div>
+
+
         <!-- タブ切り替え部分 -->
         <div id="tab-container" style="display: none;">
             <div id="tab-buttons">
