@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>目標達成ツリー</title>
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="css/style.css">
+    
+    <!-- Papa Parse for CSV handling -->
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <!-- LeaderLine for tree connections -->
+    <script src="https://cdn.jsdelivr.net/npm/leader-line@1.0.7/leader-line.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>目標達成ツリー</h1>
+        
+        <!-- タブ切り替え部分 -->
+        <div id="tab-container">
+            <div id="tab-buttons">
+                <!-- タブが動的に生成される -->
+            </div>
+        </div>
+        
+        <div id="tree-container">
+            <!-- アイコンが動的に生成される -->
+        </div>
+        
+        <div id="tooltip" class="tooltip">
+            <!-- ツールチップの内容 -->
+        </div>
+    </div>
+    
+    <script src="js/script.js"></script>
+</body>
+</html>
