@@ -3,36 +3,43 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>目標達成ツリー</title>
+    <title>講習ツリー</title>
     
-    <!-- CSS -->
-    <link rel="stylesheet" href="css/style.css">
+    <!-- LeaderLine.jsをローカルファイルから読み込み -->
+    <script src="leader-line.min.js"></script>
     
-    <!-- Papa Parse for CSV handling -->
-    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-    <!-- LeaderLine for tree connections -->
-    <script src="https://cdn.jsdelivr.net/npm/leader-line@1.0.7/leader-line.min.js"></script>
+    <!-- CSSファイルを読み込み -->
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
-        <h1>目標達成ツリー</h1>
+        <h1>講習ツリー</h1>
+        
+        <!-- CSVファイル読み込みエリア -->
+        <div id="upload-area" class="upload-area">
+            <p>CSVファイルをドラッグ&ドロップするか、クリックして選択してください</p>
+            <input type="file" id="csv-input" accept=".csv" multiple>
+        </div>
         
         <!-- タブ切り替え部分 -->
-        <div id="tab-container">
+        <div id="tab-container" style="display: none;">
             <div id="tab-buttons">
-                <!-- タブが動的に生成される -->
+                <!-- CSVファイル名に基づいてタブが動的に生成される -->
             </div>
         </div>
         
+        <!-- 進捗ツリー表示エリア -->
         <div id="tree-container">
-            <!-- アイコンが動的に生成される -->
+            <div class="loading">CSVファイルを読み込んでください</div>
         </div>
         
+        <!-- ツールチップ -->
         <div id="tooltip" class="tooltip">
             <!-- ツールチップの内容 -->
         </div>
     </div>
     
-    <script src="js/script.js"></script>
+    <!-- JavaScriptファイルを読み込み -->
+    <script src="script.js"></script>
 </body>
 </html>
