@@ -4,48 +4,41 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>講習ツリー</title>
-    
-    <!-- LeaderLine.jsをローカルファイルから読み込み -->
-    <script src="leader-line.min.js"></script>
-    
-    <!-- CSSファイルを読み込み -->
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
         <h1>講習ツリー</h1>
         
-        <!-- CSVファイル読み込みエリア
-        <div id="upload-area" class="upload-area">
-            <p>CSVファイルをドラッグ&ドロップするか、クリックして選択してください</p>
-            <input type="file" id="csv-input" accept=".csv" multiple>
+        <!-- URLパラメータ説明を追加する場合 -->
+        <div class="url-info" id="url-info" style="display: none;">
+            <p>URLからデータを読み込み中...</p>
         </div>
-         -->
+
         <div class="upload-area" id="upload-area">
-            <div class="upload-text">CSV/TSVファイルをドラッグ&ドロップするか、クリックして選択してください</div>
+            <div class="upload-text">
+                CSV/TSVファイルをドラッグ&ドロップするか、クリックして選択してください
+            </div>
             <input type="file" id="csv-input" accept=".csv,.tsv" multiple style="display: none;">
         </div>
-
-
-        <!-- タブ切り替え部分 -->
-        <div id="tab-container" style="display: none;">
-            <div id="tab-buttons">
-                <!-- CSVファイル名に基づいてタブが動的に生成される -->
-            </div>
+        
+        <div class="error-message" id="error-message"></div>
+        
+        <div class="tabs-container" id="tabs-container" style="display: none;">
+            <div class="tabs" id="tabs"></div>
         </div>
         
-        <!-- 進捗ツリー表示エリア -->
-        <div id="tree-container">
-            <div class="loading">CSVファイルを読み込んでください</div>
+        <div class="tree-container" id="tree-container" style="display: none;">
+            <div class="tree-canvas" id="tree-canvas"></div>
         </div>
         
-        <!-- ツールチップ -->
-        <div id="tooltip" class="tooltip">
-            <!-- ツールチップの内容 -->
+        <div class="controls" id="controls" style="display: none;">
+            <button id="zoom-in">ズーム+</button>
+            <button id="zoom-out">ズーム-</button>
+            <button id="reset-zoom">リセット</button>
         </div>
     </div>
     
-    <!-- JavaScriptファイルを読み込み -->
     <script src="script.js"></script>
 </body>
 </html>
