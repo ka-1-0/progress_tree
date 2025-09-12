@@ -16,6 +16,11 @@ const zoomInBtn = document.getElementById('zoom-in');
 const zoomOutBtn = document.getElementById('zoom-out');
 const resetZoomBtn = document.getElementById('reset-zoom');
 
+// --- 追加: 上部URL表示関係の要素取得 ---
+const shareUrlContainer = document.getElementById('share-url-container');
+const shareUrlInput = document.getElementById('share-url');
+const copyUrlBtn = document.getElementById('copy-url-btn');
+
 // イベントリスナーの設定
 uploadArea.addEventListener('click', () => csvInput.click());
 uploadArea.addEventListener('dragover', handleDragOver);
@@ -113,6 +118,8 @@ function readDataFile(file) {
             if (csvFiles.size === 1) {
                 switchTab(fileName);
             }
+            // --- 追加: アップロード直後にもURL表示 ---
+            updateShareUrl(fileName);
         } catch (error) {
             showError(`${file.name}の読み込みに失敗しました: ${error.message}`);
         }
@@ -240,6 +247,9 @@ function switchTab(fileName) {
     displayTree(csvFiles.get(fileName));
     treeContainer.style.display = 'block';
     controls.style.display = 'block';
+
+    // --- 追加: 現タブのURL欄を更新 ---
+    updateShareUrl(fileName);
 }
 
 // ツリー表示
@@ -539,4 +549,76 @@ function convertJsonToCsvFormat(jsonData) {
     });
     
     return csvData;
+}
+
+// URLパラメータ生成機能 - 新規追加（オプション）
+function generateUrlWithData(treeName) {
+    const treeData = csvFiles.get(treeName);
+    if (!treeData) {
+        console.error('指定されたツリーデータが見つかりません');
+        return null;
+    }
+    
+    try {
+        const jsonData = JSON.stringify(treeData);
+        const encodedData = encodeURIComponent(jsonData);
+        const baseUrl = window.location.origin + window.location.pathname;
+        const urlWithData = `${baseUrl}?data=${encodedData}&name=${encodeURIComponent(treeName)}`;
+        
+        return urlWithData;
+    } catch (error) {
+        console.error('URL生成エラー:', error);
+        return null;
+    }
+}
+
+// URLコピー機能 - 新規追加（オプション）
+function copyTreeUrl(treeName) {
+    const url = generateUrlWithData(treeName);
+    if (url) {
+        navigator.clipboard.writeText(url).then(() => {
+            alert('URLをクリップボードにコピーしました');
+        }).catch(err => {
+            console.error('コピーに失敗しました:', err);
+            // フォールバック: テキストエリアを使用
+            const textarea = document.createElement('textarea');
+            textarea.value = url;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            alert('URLをクリップボードにコピーしました');
+        });
+    }
+}
+
+function updateShareUrl(treeName) {
+  const treeData = csvFiles.get(treeName);
+  if (!treeData) {
+    shareUrlContainer.style.display = "none";
+    return;
+  }
+  try {
+    const json = JSON.stringify(treeData);
+    const baseUrl = window.location.origin + window.location.pathname;
+    const url = `${baseUrl}?data=${encodeURIComponent(json)}&name=${encodeURIComponent(treeName)}`;
+    shareUrlInput.value = url;
+    shareUrlContainer.style.display = "flex";
+  } catch (err) {
+    shareUrlContainer.style.display = "none";
+  }
+}
+
+// --- 追加: コピーボタン動作 ---
+if (copyUrlBtn) {
+  copyUrlBtn.onclick = () => {
+    shareUrlInput.select();
+    try {
+      document.execCommand('copy');
+      copyUrlBtn.innerText = "コピー完了!";
+      setTimeout(() => { copyUrlBtn.innerText = "コピー"; }, 900);
+    } catch {
+      copyUrlBtn.innerText = "手動でコピー";
+    }
+  };
 }

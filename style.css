@@ -278,3 +278,37 @@ h1 {
     border-color: #f44336;
     color: #c62828;
 }
+
+/* 追加箇所 */
+#share-url-container {
+  background: #e3f2fd;
+  border: 1px solid #2196f3;
+  border-radius: 5px;
+  padding: 10px 15px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#share-url-label {
+  font-weight: bold;
+  color: #1976d2;
+}
+
+#share-url {
+  font-size: 14px;
+  padding: 4px;
+}
+
+#copy-url-btn {
+  padding: 4px 10px;
+  background: #2196f3;
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+}
+#copy-url-btn:hover {
+  background: #1565c0;
+}
