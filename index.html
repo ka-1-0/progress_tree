@@ -1,49 +1,67 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
+    <!-- メタデータとエンコーディング設定 -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>講習ツリー</title>
+    
+    <!-- スタイルシート読み込み -->
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
+        <!-- ページヘッダー -->
         <h1>講習ツリー</h1>
-        <!-- 追加箇所 -->
-        <div id="share-url-container" style="display:none;">
-        <span id="share-url-label">ツリー共有URL:</span>
-        <input type="text" id="share-url" readonly style="width:70%;">
-        <button id="copy-url-btn">コピー</button>
+        
+        <!-- モード切り替えコントロール -->
+        <div id="view-mode-controls">
+            <button id="mode-switch-btn">スマホモードにする</button>
+            <span id="current-mode-label">[PCモード]</span>
         </div>
-        <!-- URLパラメータ説明を追加する場合 -->
-        <div class="url-info" id="url-info" style="display: none;">
-            <p>URLからデータを読み込み中...</p>
+        
+        <!-- URL共有セクション -->
+        <div id="share-url-container" style="display: none;">
+            <span id="share-url-label">ツリー共有URL:</span>
+            <input type="text" id="share-url" readonly>
+            <button id="copy-url-btn">コピー</button>
         </div>
-
+        
+        <!-- URLからの読み込み状況表示 -->
+        <div id="url-info" class="url-info" style="display: none;">
+            URLからデータを読み込み中...
+        </div>
+        
+        <!-- ファイルアップロード領域 -->
         <div class="upload-area" id="upload-area">
             <div class="upload-text">
                 CSV/TSVファイルをドラッグ&ドロップするか、クリックして選択してください
             </div>
-            <input type="file" id="csv-input" accept=".csv,.tsv" multiple style="display: none;">
+            <input type="file" id="csv-input" multiple accept=".csv,.tsv" style="display: none;">
         </div>
         
-        <div class="error-message" id="error-message"></div>
+        <!-- エラーメッセージ表示 -->
+        <div id="error-message" class="error-message"></div>
         
-        <div class="tabs-container" id="tabs-container" style="display: none;">
-            <div class="tabs" id="tabs"></div>
+        <!-- タブコンテナ -->
+        <div id="tabs-container" class="tabs-container" style="display: none;">
+            <div id="tabs" class="tabs"></div>
         </div>
         
-        <div class="tree-container" id="tree-container" style="display: none;">
-            <div class="tree-canvas" id="tree-canvas"></div>
+        <!-- ツリー表示コンテナ -->
+        <div id="tree-container" class="tree-container" style="display: none;">
+            <div id="tree-canvas" class="tree-canvas"></div>
         </div>
         
-        <div class="controls" id="controls" style="display: none;">
-            <button id="zoom-in">ズーム+</button>
-            <button id="zoom-out">ズーム-</button>
+        <!-- ズームコントロール -->
+        <div id="controls" class="controls" style="display: none;">
+            <button id="zoom-in">+</button>
+            <button id="zoom-out">-</button>
             <button id="reset-zoom">リセット</button>
         </div>
     </div>
     
+    <!-- スクリプト読み込み -->
     <script src="script.js"></script>
 </body>
 </html>

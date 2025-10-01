@@ -1,624 +1,392 @@
-// グローバル変数
-let csvFiles = new Map();
-let currentZoom = 1;
-let currentFile = null;
+/**
+ * progress_tree Main Script - Clean Version
+ * 論理・順序整理＋詳細コメント
+ */
 
-// DOM要素の取得
-const uploadArea = document.getElementById('upload-area');
-const csvInput = document.getElementById('csv-input');
-const errorMessage = document.getElementById('error-message');
-const tabsContainer = document.getElementById('tabs-container');
-const tabs = document.getElementById('tabs');
-const treeContainer = document.getElementById('tree-container');
-const treeCanvas = document.getElementById('tree-canvas');
-const controls = document.getElementById('controls');
-const zoomInBtn = document.getElementById('zoom-in');
-const zoomOutBtn = document.getElementById('zoom-out');
-const resetZoomBtn = document.getElementById('reset-zoom');
+/* ===============================
+   1. グローバル変数定義
+   =============================== */
+let csvFiles = new Map();      // ファイル名→データのMap
+let currentZoom = 1;           // ズーム倍率
+let currentFile = null;        // 現在表示中ファイル
+let viewMode = "pc";           // ユーザ閲覧モード: "pc" or "sp"
 
-// --- 追加: 上部URL表示関係の要素取得 ---
-const shareUrlContainer = document.getElementById('share-url-container');
-const shareUrlInput = document.getElementById('share-url');
-const copyUrlBtn = document.getElementById('copy-url-btn');
+/* ===============================
+   2. DOM要素取得
+   =============================== */
+const uploadArea       = document.getElementById('upload-area');
+const csvInput         = document.getElementById('csv-input');
+const errorMessage     = document.getElementById('error-message');
+const tabsContainer    = document.getElementById('tabs-container');
+const tabs             = document.getElementById('tabs');
+const treeContainer    = document.getElementById('tree-container');
+const treeCanvas       = document.getElementById('tree-canvas');
+const controls         = document.getElementById('controls');
+const zoomInBtn        = document.getElementById('zoom-in');
+const zoomOutBtn       = document.getElementById('zoom-out');
+const resetZoomBtn     = document.getElementById('reset-zoom');
+const modeSwitchBtn    = document.getElementById('mode-switch-btn');
+const currentModeLabel = document.getElementById('current-mode-label');
+const shareUrlContainer= document.getElementById('share-url-container');
+const shareUrlInput    = document.getElementById('share-url');
+const copyUrlBtn       = document.getElementById('copy-url-btn');
+const urlInfo          = document.getElementById('url-info');
 
-// イベントリスナーの設定
+/* ===============================
+   3. 初期化＆イベントリスナー設定
+   =============================== */
+document.addEventListener('DOMContentLoaded', () => {
+  resetZoom();
+  checkUrlParameters();
+});
+
+modeSwitchBtn.addEventListener('click', () => {
+  viewMode = (viewMode === 'pc') ? 'sp' : 'pc';
+  modeSwitchBtn.textContent = (viewMode === 'pc') ? 'スマホモードにする' : 'パソコンモードにする';
+  currentModeLabel.textContent = (viewMode === 'pc') ? '[PCモード]' : '[スマホモード]';
+  if (currentFile) displayTree(csvFiles.get(currentFile));
+});
+
 uploadArea.addEventListener('click', () => csvInput.click());
 uploadArea.addEventListener('dragover', handleDragOver);
 uploadArea.addEventListener('dragleave', handleDragLeave);
 uploadArea.addEventListener('drop', handleDrop);
-csvInput.addEventListener('change', (e) => processFiles(e.target.files));
+csvInput.addEventListener('change', e => processFiles(e.target.files));
 
-// ズーム機能
 zoomInBtn.addEventListener('click', () => zoom(1.2));
 zoomOutBtn.addEventListener('click', () => zoom(0.8));
 resetZoomBtn.addEventListener('click', resetZoom);
 
-// タッチイベントの追加
-let touchStartX = 0;
-let touchStartY = 0;
+window.addEventListener('resize', () => {
+  if (currentFile && window.innerWidth <= 768 && currentZoom > 0.8) {
+    currentZoom = 0.8;
+    applyZoom();
+  }
+});
 
-treeCanvas.addEventListener('touchstart', handleTouchStart, { passive: false });
-treeCanvas.addEventListener('touchmove', handleTouchMove, { passive: false });
-
-function handleTouchStart(e) {
-    const touch = e.touches[0];
-    touchStartX = touch.clientX;
-    touchStartY = touch.clientY;
-}
-
-function handleTouchMove(e) {
-    if (e.touches.length === 1) {
-        const touch = e.touches[0];
-        const deltaX = touch.clientX - touchStartX;
-        const deltaY = touch.clientY - touchStartY;
-        
-        treeCanvas.scrollLeft -= deltaX;
-        treeCanvas.scrollTop -= deltaY;
-        
-        touchStartX = touch.clientX;
-        touchStartY = touch.clientY;
-    }
-}
-
-// ドラッグ&ドロップ処理
-function handleDragOver(e) {
-    e.preventDefault();
-    uploadArea.classList.add('dragover');
-}
-
-function handleDragLeave(e) {
-    e.preventDefault();
-    uploadArea.classList.remove('dragover');
-}
-
-function handleDrop(e) {
-    e.preventDefault();
-    uploadArea.classList.remove('dragover');
-    processFiles(e.dataTransfer.files);
-}
-
-// ファイル処理
-function processFiles(files) {
-    const dataFileList = [];
-    
-    // CSV/TSVファイルのみフィルタリング
-    for (let file of files) {
-        if (file.type === 'text/csv' || file.type === 'text/tab-separated-values' || 
-            file.name.endsWith('.csv') || file.name.endsWith('.tsv')) {
-            dataFileList.push(file);
-        }
-    }
-    
-    if (dataFileList.length === 0) {
-        showError('CSV/TSVファイルを選択してください。');
-        return;
-    }
-    
-    // ファイルを読み込み
-    dataFileList.forEach(file => {
-        readDataFile(file);
-    });
-}
-
-// CSV/TSVファイル読み込み
-function readDataFile(file) {
-    const reader = new FileReader();
-    
-    reader.onload = function(e) {
-        const fileContent = e.target.result;
-        const fileName = file.name.replace(/\.(csv|tsv)$/, '');
-        const isCSV = file.name.endsWith('.csv');
-        
-        try {
-            const parsedData = parseDataFile(fileContent, isCSV);
-            csvFiles.set(fileName, parsedData);
-            updateTabs();
-            
-            // 最初のファイルを自動で選択
-            if (csvFiles.size === 1) {
-                switchTab(fileName);
-            }
-            // --- 追加: アップロード直後にもURL表示 ---
-            updateShareUrl(fileName);
-        } catch (error) {
-            showError(`${file.name}の読み込みに失敗しました: ${error.message}`);
-        }
-    };
-    
-    reader.onerror = function() {
-        showError(`${file.name}の読み込み中にエラーが発生しました。`);
-    };
-    
-    reader.readAsText(file, 'UTF-8');
-}
-
-// CSV/TSVファイルパーサー
-function parseDataFile(fileContent, isCSV = true) {
-    const lines = fileContent.trim().split('\n');
-    if (lines.length < 2) {
-        throw new Error('ファイルが空か、ヘッダー行がありません。');
-    }
-    
-    // ヘッダー行を解析
-    const headers = parseDataLine(lines[0], isCSV);
-    const expectedHeaders = ['目標ID', '親目標ID', '目標名', '説明', 'アイコンURL', 'URL', 'X座標', 'Y座標'];
-    
-    // ヘッダーチェック（部分一致でも許可）
-    const hasRequiredHeaders = expectedHeaders.slice(0, 6).every(header => 
-        headers.some(h => h.includes(header.replace('URL', '')) || header.includes(h))
-    );
-    
-    if (!hasRequiredHeaders) {
-        throw new Error('ファイルのヘッダーが正しくありません。必要な列: ' + expectedHeaders.join(', '));
-    }
-    
-    // データ行を解析
-    const data = [];
-    for (let i = 1; i < lines.length; i++) {
-        if (lines[i].trim() === '') continue;
-        
-        const values = parseDataLine(lines[i], isCSV);
-        if (values.length >= 6) {
-            data.push({
-                id: values[0] || '',
-                parentId: values[1] || '',
-                name: values[2] || '',
-                description: values[3] || '',
-                iconUrl: values[4] || '',
-                url: values[5] || '',
-                x: parseInt(values[6]) || 0,
-                y: parseInt(values[7]) || 0
-            });
-        }
-    }
-    
-    return data;
-}
-
-// CSV/TSV行をパース（カンマ区切り/タブ区切り、クォート考慮）
-function parseDataLine(line, isCSV = true) {
-    const delimiter = isCSV ? ',' : '\t';
-    const result = [];
-    let current = '';
-    let inQuotes = false;
-    
-    for (let i = 0; i < line.length; i++) {
-        const char = line[i];
-        const nextChar = line[i + 1];
-        
-        if (char === '"') {
-            if (inQuotes && nextChar === '"') {
-                // エスケープされたクォート
-                current += '"';
-                i++; // 次の文字をスキップ
-            } else {
-                // クォートの開始/終了
-                inQuotes = !inQuotes;
-            }
-        } else if (char === delimiter && !inQuotes) {
-            // 区切り文字で分割
-            result.push(current.trim());
-            current = '';
-        } else {
-            current += char;
-        }
-    }
-    
-    // 最後のフィールドを追加
-    result.push(current.trim());
-    return result;
-}
-
-// タブ更新
-function updateTabs() {
-    tabs.innerHTML = '';
-    
-    csvFiles.forEach((data, fileName) => {
-        const tab = document.createElement('button');
-        tab.className = 'tab';
-        tab.textContent = fileName;
-        tab.addEventListener('click', () => switchTab(fileName));
-        
-        // タッチイベントの追加
-        tab.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            switchTab(fileName);
-        });
-        
-        tabs.appendChild(tab);
-    });
-    
-    tabsContainer.style.display = csvFiles.size > 0 ? 'block' : 'none';
-}
-
-// タブ切り替え
-function switchTab(fileName) {
-    currentFile = fileName;
-    
-    // アクティブタブの更新
-    document.querySelectorAll('.tab').forEach(tab => {
-        tab.classList.remove('active');
-        if (tab.textContent === fileName) {
-            tab.classList.add('active');
-        }
-    });
-    
-    // ツリー表示
-    displayTree(csvFiles.get(fileName));
-    treeContainer.style.display = 'block';
-    controls.style.display = 'block';
-
-    // --- 追加: 現タブのURL欄を更新 ---
-    updateShareUrl(fileName);
-}
-
-// ツリー表示
-function displayTree(data) {
-    treeCanvas.innerHTML = '';
-    
-    // 自動配置の場合の処理
-    if (data.some(node => node.x === 0 && node.y === 0)) {
-        autoPositionNodes(data);
-    }
-    
-    // 接続線を描画
-    drawConnections(data);
-    
-    // ノードを描画
-    data.forEach(node => {
-        createTreeNode(node);
-    });
-    
-    // モバイル端末での初期ズーム調整
-    if (window.innerWidth <= 768) {
-        currentZoom = 0.8;
-        applyZoom();
-    }
-}
-
-// 自動配置
-function autoPositionNodes(data) {
-    const nodeMap = new Map();
-    data.forEach(node => nodeMap.set(node.id, node));
-    
-    // ルートノードを見つける
-    const rootNodes = data.filter(node => !node.parentId);
-    
-    let currentY = 100;
-    
-    rootNodes.forEach(rootNode => {
-        positionNodeAndChildren(rootNode, nodeMap, 100, currentY);
-        currentY += 200;
-    });
-}
-
-function positionNodeAndChildren(node, nodeMap, x, y) {
-    node.x = x;
-    node.y = y;
-    
-    // 子ノードを取得
-    const children = Array.from(nodeMap.values())
-        .filter(child => child.parentId === node.id);
-    
-    let childY = y;
-    children.forEach(child => {
-        positionNodeAndChildren(child, nodeMap, x + 250, childY);
-        childY += 150;
-    });
-}
-
-// 接続線の描画
-// function drawConnections(data) {
-//     const nodeMap = new Map();
-//     data.forEach(node => nodeMap.set(node.id, node));
-    
-//     data.forEach(node => {
-//         if (node.parentId) {
-//             const parent = nodeMap.get(node.parentId);
-//             if (parent) {
-//                 drawLine(parent.x + 75, parent.y + 50, node.x + 75, node.y + 50);
-//             }
-//         }
-//     });
-// }
-// 修正後 drawConnections
-function drawConnections(data) {
-  const nodeMap = new Map();
-  // ノードとアイコンの寸法
-  const nodeWidth = 90, nodeHeight = 60;
-  const iconSize = 60; // css .tree-node-icon { width: 30px; height: 30px }
-  const iconRadius = iconSize / 2;
-
-  data.forEach(node => nodeMap.set(node.id, node));
-  data.forEach(node => {
-    if (node.parentId) {
-      const parent = nodeMap.get(node.parentId);
-      if (parent) {
-        // ノード中心座標
-        const x1 = parent.x + nodeWidth / 2;
-        const y1 = parent.y + nodeHeight / 2;
-        const x2 = node.x + nodeWidth / 2;
-        const y2 = node.y + nodeHeight / 2;
-        // 始点→終点ベクトル
-        const dx = x2 - x1, dy = y2 - y1;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        // アイコン半径分両端を短く
-        const offsetX = (dx / dist) * iconRadius;
-        const offsetY = (dy / dist) * iconRadius;
-        // 始点/終点補正
-        const startX = x1 + offsetX;
-        const startY = y1 + offsetY;
-        const endX   = x2 - offsetX;
-        const endY   = y2 - offsetY;
-        drawLine(startX, startY, endX, endY);
-      }
+if (copyUrlBtn) {
+  copyUrlBtn.addEventListener('click', () => {
+    shareUrlInput.select();
+    try {
+      document.execCommand('copy');
+      copyUrlBtn.innerText = 'コピー完了!';
+      setTimeout(() => { copyUrlBtn.innerText = 'コピー'; }, 900);
+    } catch {
+      copyUrlBtn.innerText = '手動でコピー';
     }
   });
 }
 
-
-// 線を描画
-function drawLine(x1, y1, x2, y2) {
-    const line = document.createElement('div');
-    line.className = 'tree-line';
-    
-    const length = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
-    const angle = Math.atan2(y2 - y1, x2 - x1);
-    
-    line.style.width = length + 'px';
-    line.style.height = '2px';
-    line.style.left = x1 + 'px';
-    line.style.top = y1 + 'px';
-    line.style.transform = `rotate(${angle}rad)`;
-    line.style.transformOrigin = '0 0';
-    
-    treeCanvas.appendChild(line);
+/* ===============================
+   4. ファイル処理系関数
+   =============================== */
+function processFiles(files) {
+  const dataFiles = [];
+  for (let file of files) {
+    if (file.type === 'text/csv' || file.type === 'text/tab-separated-values' ||
+        file.name.endsWith('.csv') || file.name.endsWith('.tsv')) {
+      dataFiles.push(file);
+    }
+  }
+  if (dataFiles.length === 0) {
+    showError('CSV/TSVファイルを選択してください。');
+    return;
+  }
+  dataFiles.forEach(file => readDataFile(file));
 }
 
-// ツリーノード作成
+function handleDragOver(e) {
+  e.preventDefault();
+  uploadArea.classList.add('dragover');
+}
+
+function handleDragLeave(e) {
+  e.preventDefault();
+  uploadArea.classList.remove('dragover');
+}
+
+function handleDrop(e) {
+  e.preventDefault();
+  uploadArea.classList.remove('dragover');
+  processFiles(e.dataTransfer.files);
+}
+
+function readDataFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    const content = e.target.result;
+    const name = file.name.replace(/\.(csv|tsv)$/, '');
+    const isCSV = file.name.endsWith('.csv');
+    try {
+      const parsed = parseDataFile(content, isCSV);
+      csvFiles.set(name, parsed);
+      updateTabs();
+      if (csvFiles.size === 1) switchTab(name);
+      updateShareUrl(name);
+    } catch (err) {
+      showError(`${file.name} の読み込みに失敗: ${err.message}`);
+    }
+  };
+  reader.onerror = () => showError(`${file.name} の読み込み中にエラーが発生しました。`);
+  reader.readAsText(file, 'UTF-8');
+}
+
+/* ===============================
+   5. データ解析・変換系
+   =============================== */
+function parseDataFile(text, isCSV = true) {
+  const lines = text.trim().split('\n');
+  if (lines.length < 2) throw new Error('ヘッダー行がありません。');
+  const headers = parseDataLine(lines[0], isCSV);
+  const expected = ['目標ID','親目標ID','目標名','説明','アイコンURL','URL'];
+  if (!expected.every(h => headers.some(x => x.includes(h.replace('URL',''))))) {
+    throw new Error('ヘッダー不正。必要列: ' + expected.join(', '));
+  }
+  const data = [];
+  for (let i = 1; i < lines.length; i++) {
+    if (!lines[i].trim()) continue;
+    const vals = parseDataLine(lines[i], isCSV);
+    if (vals.length >= 6) {
+      data.push({
+        id: vals[0]||'', parentId: vals[1]||'',
+        name: vals[2]||'', description: vals[3]||'',
+        iconUrl: vals[4]||'', url: vals[5]||'',
+        x: parseInt(vals[6])||0, y: parseInt(vals[7])||0
+      });
+    }
+  }
+  return data;
+}
+
+function parseDataLine(line, isCSV = true) {
+  const delim = isCSV ? ',' : '\t';
+  const result = [];
+  let curr = '', inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i], nx = line[i+1];
+    if (ch === '"') {
+      if (inQ && nx === '"') { curr += '"'; i++; }
+      else inQ = !inQ;
+    }
+    else if (ch === delim && !inQ) {
+      result.push(curr.trim()); curr = '';
+    }
+    else curr += ch;
+  }
+  result.push(curr.trim());
+  return result;
+}
+
+function convertJsonToCsvFormat(jsonData) {
+  return jsonData.map(item => ({
+    id: item.id||'', parentId: item.parentId||'',
+    name: item.name||'', description: item.description||'',
+    iconUrl: item.iconUrl||'', url: item.url||'',
+    x: parseInt(item.x)||0, y: parseInt(item.y)||0
+  }));
+}
+
+/* ===============================
+   6. UI更新・タブ操作系
+   =============================== */
+function updateTabs() {
+  tabs.innerHTML = '';
+  csvFiles.forEach((_, name) => {
+    const btn = document.createElement('button');
+    btn.className = 'tab';
+    btn.textContent = name;
+    btn.addEventListener('click', () => switchTab(name));
+    btn.addEventListener('touchstart', e => { e.preventDefault(); switchTab(name); });
+    tabs.appendChild(btn);
+  });
+  tabsContainer.style.display = csvFiles.size ? 'block' : 'none';
+}
+
+function switchTab(name) {
+  currentFile = name;
+  document.querySelectorAll('.tab').forEach(t => {
+    t.classList.toggle('active', t.textContent === name);
+  });
+  displayTree(csvFiles.get(name));
+  treeContainer.style.display = 'block';
+  controls.style.display = 'block';
+  updateShareUrl(name);
+}
+
+/* ===============================
+   7. URL共有機能
+   =============================== */
+function checkUrlParameters() {
+  const p = new URLSearchParams(window.location.search);
+  const data = p.get('data'), nm = p.get('name') || 'URLツリー';
+  if (data) {
+    showUrlInfo('URLから読み込み中...', 'loading');
+    try {
+      const decoded = decodeURIComponent(data);
+      const arr = JSON.parse(decoded);
+      const parsed = convertJsonToCsvFormat(arr);
+      csvFiles.set(nm, parsed);
+      updateTabs(); switchTab(nm);
+      showUrlInfo(`「${nm}」を読み込みました`, 'success');
+      setTimeout(hideUrlInfo, 3000);
+    } catch {
+      showUrlInfo('URL読み込み失敗', 'error');
+      setTimeout(hideUrlInfo, 5000);
+    }
+  }
+}
+
+function updateShareUrl(name) {
+  const data = csvFiles.get(name);
+  if (!data) { shareUrlContainer.style.display = 'none'; return; }
+  try {
+    const json = JSON.stringify(data);
+    const url = `${location.origin}${location.pathname}?data=${encodeURIComponent(json)}&name=${encodeURIComponent(name)}`;
+    shareUrlInput.value = url;
+    shareUrlContainer.style.display = 'flex';
+  } catch {
+    shareUrlContainer.style.display = 'none';
+  }
+}
+
+function showUrlInfo(msg, type='loading') {
+  urlInfo.textContent = msg;
+  urlInfo.className = `url-info ${type}`;
+  urlInfo.style.display = 'block';
+}
+
+function hideUrlInfo() {
+  urlInfo.style.display = 'none';
+}
+
+/* ===============================
+   8. ツリー描画系
+   =============================== */
+function displayTree(data) {
+  treeCanvas.innerHTML = '';
+  if (data.some(n => n.x === 0 && n.y === 0)) autoPositionNodes(data);
+  drawConnections(data);
+  data.forEach(createTreeNode);
+  if (window.innerWidth <= 768) { currentZoom = 0.8; applyZoom(); }
+}
+
+function autoPositionNodes(data) {
+  const map = new Map(data.map(n => [n.id, n]));
+  const roots = data.filter(n => !n.parentId);
+  let y = 100;
+  roots.forEach(r => { positionNodeAndChildren(r, map, 100, y); y += 200; });
+}
+
+function positionNodeAndChildren(node, map, x, y) {
+  node.x = x; node.y = y;
+  Array.from(map.values()).filter(c => c.parentId === node.id)
+    .forEach((c, i) => positionNodeAndChildren(c, map, x+250, y + i*150));
+}
+
+function drawConnections(data) {
+  const map = new Map(data.map(n => [n.id, n]));
+  const w=90, h=60, ico=60, r=ico/2;
+  data.forEach(n => {
+    if (!n.parentId) return;
+    const p = map.get(n.parentId);
+    if (!p) return;
+    const x1=p.x+w/2, y1=p.y+h/2, x2=n.x+w/2, y2=n.y+h/2;
+    const dx=x2-x1, dy=y2-y1, d=Math.hypot(dx,dy);
+    const ox=(dx/d)*r, oy=(dy/d)*r;
+    drawLine(x1+ox, y1+oy, x2-ox, y2-oy);
+  });
+}
+
+function drawLine(x1,y1,x2,y2) {
+  const line = document.createElement('div');
+  line.className = 'tree-line';
+  const len = Math.hypot(x2-x1, y2-y1);
+  const ang = Math.atan2(y2-y1, x2-x1);
+  Object.assign(line.style, {
+    width: `${len}px`, height: '2px',
+    left: `${x1}px`, top: `${y1}px`,
+    transform: `rotate(${ang}rad)`, transformOrigin: '0 0'
+  });
+  treeCanvas.appendChild(line);
+}
+
+/* ===============================
+   9. ノード生成（PC/SP挙動分岐含む）
+   =============================== */
 function createTreeNode(node) {
-    const nodeElement = document.createElement('div');
-    nodeElement.className = 'tree-node';
-    nodeElement.style.left = node.x + 'px';
-    nodeElement.style.top = node.y + 'px';
-    
-    // 修正後 script.js
-    const iconContainer = document.createElement('div');
-    iconContainer.className = 'tree-node-icon';
-    // 画像はいっぱいに
-    iconContainer.style.backgroundImage = node.iconUrl && node.iconUrl.trim() !== ''
-    ? (!node.iconUrl.startsWith('http') ? `url(images/${node.iconUrl})` : `url(${node.iconUrl})`)
-    : '';
-    iconContainer.style.backgroundSize = 'cover';
-    iconContainer.style.backgroundPosition = 'center';
-    iconContainer.style.backgroundRepeat = 'no-repeat';
-    iconContainer.style.backgroundColor  = '#222'; // 見切れ時の余白色
+  const el = document.createElement('div');
+  el.className = 'tree-node';
+  el.style.left = `${node.x}px`;
+  el.style.top  = `${node.y}px`;
 
-    // ツールチップ部分
-    const tooltip = document.createElement('div');
-    tooltip.className = 'tooltip';
-    tooltip.innerHTML = `<strong>${node.name}</strong><br>${node.description}`;
-    // 初期は非表示
-    tooltip.style.display = "none";
-    iconContainer.appendChild(tooltip);
+  const icon = document.createElement('div');
+  icon.className = 'tree-node-icon';
+  if (node.iconUrl) {
+    icon.style.backgroundImage = node.iconUrl.startsWith('http')
+      ? `url(${node.iconUrl})`
+      : `url(images/${node.iconUrl})`;
+  }
+  const tooltip = document.createElement('div');
+  tooltip.className = 'tooltip';
+  tooltip.innerHTML = `<b>${node.name}</b><br>${node.description}`;
+  icon.appendChild(tooltip);
 
-    // ホバー動作
-    iconContainer.addEventListener('mouseenter', () => { tooltip.style.display = 'block'; });
-    iconContainer.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
-
-    nodeElement.appendChild(iconContainer);
-    // ※名前、説明はここで追加しない
-
-    
-    // クリック/タップイベント
-    nodeElement.addEventListener('click', () => {
-        if (node.url) {
-            window.open(node.url, '_blank');
-        }
+  if (viewMode === 'pc') {
+    icon.addEventListener('mouseenter', () => tooltip.style.display = 'block');
+    icon.addEventListener('mouseleave', () => tooltip.style.display = 'none');
+    icon.addEventListener('click', () => {
+      if (node.url) window.open(node.url, '_blank');
     });
-    
-    // タッチイベント
-    nodeElement.addEventListener('touchstart', (e) => {
-        e.stopPropagation();
+  } else {
+    let tapped = false;
+    icon.addEventListener('click', e => {
+      e.stopPropagation();
+      if (!tapped) {
+        tooltip.style.display = tooltip.style.display === 'block' ? 'none' : 'block';
+        tapped = true;
+        setTimeout(() => tapped = false, 1000);
+      } else {
+        tooltip.style.display = 'none';
+        if (node.url) window.open(node.url, '_blank');
+        tapped = false;
+      }
     });
-    
-    nodeElement.addEventListener('touchend', (e) => {
-        e.preventDefault();
-        if (node.url) {
-            window.open(node.url, '_blank');
-        }
+    document.addEventListener('click', e => {
+      if (!icon.contains(e.target)) {
+        tooltip.style.display = 'none';
+        tapped = false;
+      }
     });
-    
-    treeCanvas.appendChild(nodeElement);
+  }
+
+  el.appendChild(icon);
+  treeCanvas.appendChild(el);
 }
 
-
-// ズーム機能
+/* ===============================
+   10. ズーム処理
+   =============================== */
 function zoom(factor) {
-    currentZoom *= factor;
-    currentZoom = Math.max(0.3, Math.min(currentZoom, 3));
-    applyZoom();
+  currentZoom *= factor;
+  currentZoom = Math.max(0.3, Math.min(currentZoom, 3));
+  applyZoom();
 }
 
 function resetZoom() {
-    currentZoom = window.innerWidth <= 768 ? 0.8 : 1;
-    applyZoom();
+  currentZoom = window.innerWidth <= 768 ? 0.8 : 1;
+  applyZoom();
 }
 
 function applyZoom() {
-    treeCanvas.style.transform = `scale(${currentZoom})`;
-    treeCanvas.style.transformOrigin = '0 0';
+  treeCanvas.style.transform = `scale(${currentZoom})`;
+  treeCanvas.style.transformOrigin = '0 0';
 }
 
-// エラーメッセージ表示
-function showError(message) {
-    errorMessage.textContent = message;
-    errorMessage.style.display = 'block';
-    
-    // 5秒後に非表示
-    setTimeout(() => {
-        errorMessage.style.display = 'none';
-    }, 5000);
-}
-
-// 画面リサイズ時の処理
-window.addEventListener('resize', () => {
-    if (currentFile) {
-        // モバイル端末での初期ズーム調整
-        if (window.innerWidth <= 768 && currentZoom > 0.8) {
-            currentZoom = 0.8;
-            applyZoom();
-        }
-    }
-});
-
-// 初期化
-document.addEventListener('DOMContentLoaded', () => {
-    // 初期状態の設定
-    resetZoom();
-    // URLパラメータをチェック
-    checkUrlParameters();
-});
-
-// URLパラメータチェック機能 - 新規追加
-function checkUrlParameters() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const jsonData = urlParams.get('data');
-    const treeName = urlParams.get('name') || 'URLツリー';
-    
-    if (jsonData) {
-        try {
-            showUrlInfo('URLからデータを読み込み中...', 'loading');
-            
-            // URLデコードしてJSONパース
-            const decodedData = decodeURIComponent(jsonData);
-            const treeData = JSON.parse(decodedData);
-            
-            // JSONデータをCSV形式に変換
-            const csvData = convertJsonToCsvFormat(treeData);
-            
-            // データを追加
-            csvFiles.set(treeName, csvData);
-            updateTabs();
-            switchTab(treeName);
-            
-            showUrlInfo(`「${treeName}」を読み込みました`, 'success');
-            setTimeout(() => hideUrlInfo(), 3000);
-            
-        } catch (error) {
-            console.error('URLパラメータの解析エラー:', error);
-            showUrlInfo('URLからのデータ読み込みに失敗しました', 'error');
-            setTimeout(() => hideUrlInfo(), 5000);
-        }
-    }
-}
-
-// URL情報表示 - 新規追加
-function showUrlInfo(message, type = 'loading') {
-    const urlInfo = document.getElementById('url-info');
-    if (urlInfo) {
-        urlInfo.textContent = message;
-        urlInfo.className = `url-info ${type}`;
-        urlInfo.style.display = 'block';
-    }
-}
-
-// URL情報非表示 - 新規追加
-function hideUrlInfo() {
-    const urlInfo = document.getElementById('url-info');
-    if (urlInfo) {
-        urlInfo.style.display = 'none';
-    }
-}
-
-// JSONをCSV形式データに変換 - 新規追加
-function convertJsonToCsvFormat(jsonData) {
-    const csvData = [];
-    
-    jsonData.forEach(item => {
-        csvData.push({
-            id: item.id || '',
-            parentId: item.parentId || '',
-            name: item.name || '',
-            description: item.description || '',
-            iconUrl: item.iconUrl || '',
-            url: item.url || '',
-            x: parseInt(item.x) || 0,
-            y: parseInt(item.y) || 0
-        });
-    });
-    
-    return csvData;
-}
-
-// URLパラメータ生成機能 - 新規追加（オプション）
-function generateUrlWithData(treeName) {
-    const treeData = csvFiles.get(treeName);
-    if (!treeData) {
-        console.error('指定されたツリーデータが見つかりません');
-        return null;
-    }
-    
-    try {
-        const jsonData = JSON.stringify(treeData);
-        const encodedData = encodeURIComponent(jsonData);
-        const baseUrl = window.location.origin + window.location.pathname;
-        const urlWithData = `${baseUrl}?data=${encodedData}&name=${encodeURIComponent(treeName)}`;
-        
-        return urlWithData;
-    } catch (error) {
-        console.error('URL生成エラー:', error);
-        return null;
-    }
-}
-
-// URLコピー機能 - 新規追加（オプション）
-function copyTreeUrl(treeName) {
-    const url = generateUrlWithData(treeName);
-    if (url) {
-        navigator.clipboard.writeText(url).then(() => {
-            alert('URLをクリップボードにコピーしました');
-        }).catch(err => {
-            console.error('コピーに失敗しました:', err);
-            // フォールバック: テキストエリアを使用
-            const textarea = document.createElement('textarea');
-            textarea.value = url;
-            document.body.appendChild(textarea);
-            textarea.select();
-            document.execCommand('copy');
-            document.body.removeChild(textarea);
-            alert('URLをクリップボードにコピーしました');
-        });
-    }
-}
-
-function updateShareUrl(treeName) {
-  const treeData = csvFiles.get(treeName);
-  if (!treeData) {
-    shareUrlContainer.style.display = "none";
-    return;
-  }
-  try {
-    const json = JSON.stringify(treeData);
-    const baseUrl = window.location.origin + window.location.pathname;
-    const url = `${baseUrl}?data=${encodeURIComponent(json)}&name=${encodeURIComponent(treeName)}`;
-    shareUrlInput.value = url;
-    shareUrlContainer.style.display = "flex";
-  } catch (err) {
-    shareUrlContainer.style.display = "none";
-  }
-}
-
-// --- 追加: コピーボタン動作 ---
-if (copyUrlBtn) {
-  copyUrlBtn.onclick = () => {
-    shareUrlInput.select();
-    try {
-      document.execCommand('copy');
-      copyUrlBtn.innerText = "コピー完了!";
-      setTimeout(() => { copyUrlBtn.innerText = "コピー"; }, 900);
-    } catch {
-      copyUrlBtn.innerText = "手動でコピー";
-    }
-  };
+/* ===============================
+   11. エラーハンドリング
+   =============================== */
+function showError(msg) {
+  errorMessage.textContent = msg;
+  errorMessage.style.display = 'block';
+  setTimeout(() => errorMessage.style.display = 'none', 5000);
 }
