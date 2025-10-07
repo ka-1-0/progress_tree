@@ -186,6 +186,34 @@ function convertJsonToCsvFormat(jsonData) {
   }));
 }
 
+// 追加: データ構造最適化関数
+function optimizeTreeData(treeData) {
+  return treeData.map(node => ({
+    i: node.id,           // id → i
+    p: node.parentId,     // parentId → p
+    n: node.name,         // name → n
+    d: node.description,  // description → d
+    c: node.iconUrl,      // iconUrl → c
+    u: node.url,          // url → u
+    x: node.x,            // x座標
+    y: node.y             // y座標
+  }));
+}
+
+// 追加: 最適化データの復元関数
+function restoreTreeData(optimizedData) {
+  return optimizedData.map(node => ({
+    id: node.i || '',
+    parentId: node.p || '',
+    name: node.n || '',
+    description: node.d || '',
+    iconUrl: node.c || '',
+    url: node.u || '',
+    x: parseInt(node.x) || 0,
+    y: parseInt(node.y) || 0
+  }));
+}
+
 /* ===============================
    6. UI更新・タブ操作系
    =============================== */
@@ -222,32 +250,56 @@ function checkUrlParameters() {
   if (data) {
     showUrlInfo('URLから読み込み中...', 'loading');
     try {
-      const decoded = decodeURIComponent(data);
-      const arr = JSON.parse(decoded);
+      // LZString圧縮データかどうか判定して処理を分岐
+      let arr;
+      try {
+        // 新形式: LZString圧縮データの復元
+        const decompressed = LZString.decompressFromEncodedURIComponent(data);
+        if (decompressed) {
+          const optimizedData = JSON.parse(decompressed);
+          arr = restoreTreeData(optimizedData);
+        } else {
+          throw new Error('LZString復元失敗');
+        }
+      } catch {
+        // 旧形式: 通常のJSONデータ（後方互換性）
+        const decoded = decodeURIComponent(data);
+        arr = JSON.parse(decoded);
+      }
+      
       const parsed = convertJsonToCsvFormat(arr);
       csvFiles.set(nm, parsed);
       updateTabs(); switchTab(nm);
       showUrlInfo(`「${nm}」を読み込みました`, 'success');
       setTimeout(hideUrlInfo, 3000);
-    } catch {
+    } catch (error) {
+      console.error('URLパラメータ復元エラー:', error);
       showUrlInfo('URL読み込み失敗', 'error');
       setTimeout(hideUrlInfo, 5000);
     }
   }
 }
 
+
 function updateShareUrl(name) {
   const data = csvFiles.get(name);
   if (!data) { shareUrlContainer.style.display = 'none'; return; }
   try {
-    const json = JSON.stringify(data);
-    const url = `${location.origin}${location.pathname}?data=${encodeURIComponent(json)}&name=${encodeURIComponent(name)}`;
+    // 1) データ構造を最適化
+    const optimized = optimizeTreeData(data);
+    // 2) JSON → LZString圧縮
+    const jsonStr = JSON.stringify(optimized);
+    const compressed = LZString.compressToEncodedURIComponent(jsonStr);    
+    // 3) URL生成
+    const url = `${location.origin}${location.pathname}?data=${compressed}&name=${encodeURIComponent(name)}`;
     shareUrlInput.value = url;
-    shareUrlContainer.style.display = 'flex';
-  } catch {
+    shareUrlContainer.style.display = 'flex';    
+  } catch (error) {
+    console.error('URL生成エラー:', error);
     shareUrlContainer.style.display = 'none';
   }
 }
+
 
 function showUrlInfo(msg, type='loading') {
   urlInfo.textContent = msg;
